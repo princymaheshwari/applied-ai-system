@@ -52,9 +52,69 @@ def snapshot(
     repo: Path = typer.Option(
         Path("."), "--repo", "-r", help="Path to the repo to snapshot."
     ),
+    skip_os_packages: bool = typer.Option(
+        False, "--skip-os-packages", help="Skip OS package detection (faster)."
+    ),
+    skip_env_vars: bool = typer.Option(
+        False, "--skip-env-vars", help="Skip environment variable capture."
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show detailed progress."
+    ),
 ) -> None:
-    """Capture a deterministic snapshot of the current environment."""
-    _stub("1", f"snapshot module lands in Phase 1. Would write to {output} from {repo}.")
+    """Capture a deterministic snapshot of the current environment.
+
+    This captures:
+    - Lockfiles (requirements.txt, uv.lock, package-lock.json, etc.)
+    - Dockerfiles
+    - Environment variables (with secrets redacted)
+    - OS packages (dpkg, apt, brew, etc.)
+    - Runtime versions (Python, Node, Ruby, etc.)
+    - Locale and timezone settings
+    - System info (OS, kernel, glibc/musl, architecture)
+    """
+    import logging
+
+    from config_detective.snapshot import capture_snapshot, save_snapshot
+
+    # Configure logging based on verbosity
+    if verbose:
+        logging.basicConfig(level=logging.DEBUG, format="%(message)s")
+    else:
+        logging.basicConfig(level=logging.WARNING)
+
+    repo_path = repo.resolve()
+
+    console.print(f"[blue]Capturing snapshot from:[/blue] {repo_path}")
+
+    with console.status("[bold green]Capturing environment snapshot..."):
+        snap = capture_snapshot(
+            repo_path=repo_path,
+            include_os_packages=not skip_os_packages,
+            include_env_vars=not skip_env_vars,
+        )
+
+    # Print summary
+    console.print()
+    console.print("[bold green]Snapshot captured![/bold green]")
+    console.print(f"  Hash: [cyan]{snap.snapshot_hash}[/cyan]")
+    console.print(f"  Lockfiles: {len(snap.lockfiles)}")
+    console.print(f"  Dockerfiles: {len(snap.dockerfiles)}")
+    console.print(f"  Env vars: {len(snap.env_vars)} ({sum(1 for e in snap.env_vars if e.redacted)} redacted)")
+    console.print(f"  OS packages: {len(snap.os_packages)}")
+    console.print(f"  Python: {snap.runtime_versions.python or 'not detected'}")
+    console.print(f"  System: {snap.system.os_release or snap.system.os_type.value}")
+
+    if snap.capture_errors:
+        console.print()
+        console.print(f"[yellow]Warnings ({len(snap.capture_errors)}):[/yellow]")
+        for error in snap.capture_errors:
+            console.print(f"  - {error}")
+
+    # Save to file
+    save_snapshot(snap, output)
+    console.print()
+    console.print(f"[green]Saved to:[/green] {output}")
 
 
 @app.command()
