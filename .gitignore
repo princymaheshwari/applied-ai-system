@@ -62,8 +62,8 @@ Desktop.ini
 *.swo
 *.bak
 
-# --- Cursor (keep plans visible to user, but ignore project-specific data) ---
-# .cursor/plans is intentionally NOT ignored so the plan stays in the repo
+# --- Cursor (plans stay local for documentation, not pushed to GitHub) ---
+.cursor/
 
 # --- Docker artifacts ---
 *.tar
