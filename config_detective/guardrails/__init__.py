@@ -1,0 +1,1 @@
+"""Guardrails - PII / secret scrubber, hallucination guard (claimed cause must exist in delta), refusal patterns, and hard iteration / time caps. Lands in Phase 7."""

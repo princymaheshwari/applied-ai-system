@@ -1,0 +1,1 @@
+"""Snapshot layer - captures lockfiles, Dockerfile layers, env vars, OS packages, runtime versions, locale, and timezone into a deterministic JSON snapshot. Lands in Phase 1."""

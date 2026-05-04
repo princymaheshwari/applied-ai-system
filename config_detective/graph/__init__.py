@@ -1,0 +1,1 @@
+"""Environment Graph RAG - multi-layer NetworkX graph with typed nodes (PythonPackage, OSPackage, EnvVar, DockerfileLayer, etc.) and cross-layer edges, plus the differ that extracts deltas between two snapshots. Lands in Phase 2."""

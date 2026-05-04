@@ -1,74 +1,160 @@
-# 🎮 Game Glitch Investigator: The Impossible Guesser
+# CONFIG DETECTIVE
 
-## 🚨 The Situation
+> An agentic forensics tool that diagnoses "works on my machine" bugs by performing differential bisection over a multi-layer environment graph, with episodic memory in Supabase pgvector and empirical sandbox verification of every proposed fix. Ships as a CLI, Streamlit app, and Model Context Protocol server.
 
-You asked an AI to build a simple "Number Guessing Game" using Streamlit.
-It wrote the code, ran away, and now the game is unplayable. 
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Status: in development](https://img.shields.io/badge/status-in--development-orange.svg)]()
 
-- You can't win.
-- The hints lie to you.
-- The secret number seems to have commitment issues.
+---
 
-## 🛠️ Setup
+## Base project (Module 1-3)
 
-1. Install dependencies: `pip install -r requirements.txt`
-2. Run the broken app: `python -m streamlit run app.py`
+This project extends [**Game Glitch Investigator**](./legacy/README.md), my Module 1 number guessing game / debugging exercise. The original project was a Streamlit number-guessing game intentionally shipped with nine bugs across game logic, state management, and UI — fixed via systematic debugging, refactored into `logic_utils.py`, and validated by a 36-test pytest suite. The original code is preserved unchanged in [`legacy/`](./legacy).
 
-## 🕵️‍♂️ Your Mission
+The "investigator" DNA — systematic root-cause analysis backed by automated verification — is now generalized to a much harder target: diagnosing config-divergence bugs in real software environments.
 
-1. **Play the game.** Open the "Developer Debug Info" tab in the app to see the secret number. Try to win.
-2. **Find the State Bug.** Why does the secret number change every time you click "Submit"? Ask ChatGPT: *"How do I keep a variable from resetting in Streamlit when I click a button?"*
-3. **Fix the Logic.** The hints ("Higher/Lower") are wrong. Fix them.
-4. **Refactor & Test.** - Move the logic into `logic_utils.py`.
-   - Run `pytest` in your terminal.
-   - Keep fixing until all tests pass!
+## Why this project exists
 
-## 📝 Document Your Experience
+Anyone who has shipped software has lived this nightmare: code runs perfectly on a developer laptop, breaks in CI, breaks differently in Docker, breaks again in production. The cause is rarely the code itself — it's a config delta hiding in lockfiles, env vars, OS packages, locale, timezone, OpenSSL versions, glibc versions, or Python minor versions.
 
-### Game Purpose
+**Standard AI debugging tools assume the code is the only variable.** They miss config bugs entirely. CONFIG DETECTIVE doesn't.
 
-This is a number guessing game built with Streamlit. The player picks a difficulty (Easy: 1–20, Normal: 1–100, Hard: 1–200), is given a limited number of attempts, and tries to guess the secret number. After each guess the game tells you whether to go higher or lower. Your score starts at a maximum and decreases with each wrong guess. The game was intentionally shipped broken as a debugging exercise.
+Given two environment snapshots (one where the code works, one where it fails) plus the failure trace, CONFIG DETECTIVE:
 
-### Bugs Found
+1. Builds a multi-layer **environment graph** (Python deps + OS packages + env vars + Dockerfile layers + locale + timezone + runtime versions) for each side
+2. Computes the **delta** across all layers
+3. Ranks suspects using **memory of past investigations** (Supabase pgvector) plus **multi-source RAG** over GitHub Issues, StackOverflow, and OSV.dev
+4. Generates the top-3 hypothesized fixes
+5. **Empirically verifies** each candidate by rebuilding the failing environment in a disposable Docker container with the candidate fix applied and re-running the original failure
+6. Returns the verified fix with a confidence score, sandbox proof, and an applicable patch
 
-I found 9 bugs across game logic, state management, and display:
+Two operating modes: **propose** (default — shows the diff, waits for human "Apply") and **apply** (writes the patch directly, with `undo` always available).
 
-1. **Attempts started at 1** — the counter was initialized to 1 instead of 0, consuming one attempt before the player guessed anything
-2. **Hints were reversed** — guessing too high told you to go higher, guessing too low told you to go lower
-3. **New game button did not reset the game** — only `attempts` and `secret` were reset; `status`, `score`, and `history` were left stale, blocking play after a win or loss
-4. **Range display was hardcoded to 1–100** — the in-game prompt always showed "Guess a number between 1 and 100" regardless of difficulty
-5. **Game ended one attempt early** — a side effect of Bug 1; every difficulty effectively lost one usable guess
-6. **Score was inconsistent** — "Too High" guesses on even-numbered attempts added 5 points instead of subtracting
-7. **Type coercion on even attempts** — the secret was cast to `str` before being passed to `check_guess`, causing unreliable string comparison on every second guess
-8. **Hard difficulty was easier than Normal** — Hard had range 1–50, Normal had 1–100, making Hard statistically easier to win
-9. **New game generated a secret outside the difficulty range** — the reset hardcoded `random.randint(1, 100)` regardless of which difficulty was active
+## Architecture
 
-### Fixes Applied
+![Architecture diagram](assets/architecture.png)
 
-All logic was moved from `app.py` into `logic_utils.py` and fixed there. Copilot Agent was used throughout to help identify bugs, write fixes, and generate tests.
+> The mermaid source for this diagram is at [`assets/architecture.mmd`](./assets/architecture.mmd). To regenerate the PNG, paste the mermaid source into the [Mermaid Live Editor](https://mermaid.live/) and export as PNG.
 
-| Bug | Fix |
-|---|---|
-| Attempts started at 1 | Changed initialization to `0` |
-| Reversed hints | Swapped "Go HIGHER!" and "Go LOWER!" messages in `check_guess` |
-| New game incomplete reset | Created `reset_game(low, high)` in `logic_utils.py` that resets all 5 state keys |
-| Range hardcoded to 1–100 | Replaced hardcoded string with `{low}` and `{high}` variables |
-| Game ended early | Fixed by Bug 1 fix |
-| Inconsistent score | Removed even/odd attempt branch; both wrong guess types always subtract 5 |
-| Type coercion | Removed the `str(secret)` cast; secret is always passed as an integer |
-| Hard easier than Normal | Changed Hard range from 1–50 to 1–200 |
-| New game wrong range | `reset_game` now takes `low, high` from `get_range_for_difficulty(difficulty)` |
+### Component overview
 
-Decimal inputs (e.g. `3.9`) were also discovered to silently truncate to `3`, which could cause a false win if the secret was `3`. Fixed by rejecting any input containing a `.` with "Please enter a whole number."
+- **Snapshot layer** ([`config_detective/snapshot/`](./config_detective/snapshot)) — captures lockfiles, Dockerfile layers, env vars (PII-scrubbed), OS package list, runtime versions, locale, timezone into a deterministic JSON
+- **Environment Graph RAG** ([`config_detective/graph/`](./config_detective/graph)) — multi-layer NetworkX graph with typed nodes (`PythonPackage`, `OSPackage`, `EnvVar`, `DockerfileLayer`, etc.) and cross-layer edges. The differ extracts deltas between two snapshots
+- **Memory RAG** ([`config_detective/memory/`](./config_detective/memory)) — Supabase pgvector backed episodic memory of past `(failure → root cause → fix)` cases plus a semantic memory of compressed patterns
+- **Multi-source RAG** ([`config_detective/retrieval/`](./config_detective/retrieval)) — fans out to GitHub Issues, StackExchange, OSV.dev, libraries.io, with local SQLite cache
+- **Multi-agent orchestrator** ([`config_detective/agents/`](./config_detective/agents)) — LangGraph state machine: Triager → Prioritizer → Hypothesizer (k=3) → Sandbox Verifier → Critic → Reporter, with all intermediate states observable
+- **Sandbox verifier** ([`config_detective/sandbox/`](./config_detective/sandbox)) — Docker SDK ephemeral containers with resource caps; Windows subprocess fallback
+- **Patcher** ([`config_detective/patcher/`](./config_detective/patcher)) — unified-diff builder, applier, rollback (`undo`), interactive confirm prompt
+- **Guardrails** ([`config_detective/guardrails/`](./config_detective/guardrails)) — PII scrubber, hallucination guard (claimed cause must exist in delta), iteration/time caps
+- **MCP server** ([`config_detective/mcp_server/`](./config_detective/mcp_server)) — exposes the agent as MCP tools for use directly from Cursor / Claude Desktop
 
-### AI Collaboration — Copilot Agent
+## Setup
 
-I used Copilot Agent mode to help identify bugs in the original code, plan the refactor into `logic_utils.py`, generate the initial pytest suite, and suggest edge case inputs to test. One suggestion was misleading — Copilot claimed a "dead score calculation line" existed (two lines overwriting each other) when git history showed only one line ever existed. The formula change it suggested (`attempt_number - 1`) turned out to be correct game logic, but the stated justification was false. I verified every suggestion by checking the git history and running the game manually before accepting it.
+> Status: setup instructions are accurate as of project scaffolding. Some commands assume Phase 1+ work has landed; sections marked with [in progress] will be filled in as features land.
 
-## 📸 Demo
+### Prerequisites
 
-### Fixed Game — Winning Run
-![alt text](demo.png)
+- Python 3.11 or higher
+- Git
+- Docker Desktop with WSL2 backend (Windows) — only required for Phase 6 sandbox verifier; can be deferred during early phases
 
-### pytest Results — 36 Tests Passing (Challenge 1: Advanced Edge-Case Testing)
-![alt text](pytests.png)
+### 1. Clone and create a virtual environment
+
+```bash
+git clone https://github.com/princymaheshwari/applied-ai-system.git
+cd applied-ai-system
+
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
+```
+
+### 2. Install dependencies
+
+```bash
+pip install -e ".[dev]"
+# Or, if pyproject.toml extras are giving trouble:
+pip install -r requirements-dev.txt
+```
+
+### 3. Configure environment variables
+
+Copy the template and fill in your keys:
+
+```bash
+# Windows
+copy .env.example .env
+# macOS/Linux
+cp .env.example .env
+```
+
+Open `.env` in your editor and replace each `your_..._here` placeholder with the real key:
+
+- `GROQ_API_KEY` — from [console.groq.com](https://console.groq.com) (free)
+- `GOOGLE_API_KEY` — from [aistudio.google.com](https://aistudio.google.com) (free, Gemini fallback)
+- `HF_TOKEN` — from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) (free, Read scope)
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — from your Supabase project's API settings; ensure pgvector extension is enabled
+
+### 4. Run the Streamlit UI
+
+```bash
+# [in progress] - lands in Phase 9
+python -m streamlit run config_detective/streamlit_app.py
+```
+
+### 5. Run the CLI
+
+```bash
+# [in progress] - lands in Phase 1
+config-detective --help
+config-detective snapshot --output snap.json
+config-detective investigate --snap-a a.json --snap-b b.json --trace error.log
+config-detective eval                    # runs the 15-case benchmark
+config-detective mcp-serve               # starts the MCP server (stdio transport)
+```
+
+### 6. Run the test suite
+
+```bash
+pytest                                   # config_detective tests at top-level
+pytest legacy/tests                      # the original Game Glitch Investigator tests, preserved
+```
+
+## Sample interactions
+
+> [in progress] - finalized Loom-quality samples will be added once Phase 5 (orchestrator) and Phase 6 (sandbox) land.
+
+Three planned demo cases (full inputs/outputs will be filled in as the system comes online):
+
+1. **Locale bug** — works on Ubuntu (LANG=en_US.UTF-8), fails in Alpine container (LANG=C) with `UnicodeDecodeError`. Expected agent output: identifies LANG delta, sandbox-verifies fix `ENV LANG=C.UTF-8`.
+2. **OpenSSL major version drift** — works on Debian Bookworm (libssl3), fails on Bullseye (libssl1.1) with `cryptography.exceptions.UnsupportedAlgorithm`. Expected output: identifies libssl delta, recommends compatible cryptography version pin.
+3. **Timezone-dependent test** — pytest passes locally (UTC), fails in CI (Asia/Kolkata). Expected output: identifies TZ delta, recommends `ENV TZ=UTC` in CI.
+
+## Design decisions
+
+> [in progress] - filled in as decisions land. Initial decisions:
+
+- **LangGraph for the agent loop** — chosen over hand-rolled state machines for built-in observability of intermediate states (rubric stretch +2)
+- **Supabase pgvector** chosen over self-hosted Chroma/Qdrant — free tier, hosted, integrates with auth and Postgres in one product
+- **Groq + Gemini as dual LLM providers** — Groq is fast and free but rate-limited; Gemini provides graceful fallback
+- **Empirical sandbox verification before reporting** — the load-bearing differentiator vs generic LLM debuggers; every reported root cause is backed by a reproducible experiment
+- **Propose-by-default, apply-by-flag** — agent has full auto-apply capability but defaults to human-in-the-loop for safety, with one-shot `undo` available
+
+## Testing summary
+
+> [in progress] - results from each phase will be summarized here. Target metrics: top-1 root-cause accuracy, top-3 accuracy, hallucination rate, mean confidence on the 15-case seeded benchmark.
+
+## Reflection
+
+> [in progress] - long-form reflection lives in [`model_card.md`](./model_card.md). This section will summarize highlights once the system is feature-complete.
+
+## Demo
+
+> [in progress] - Loom video walkthrough link will be added here showing 3 sample inputs end-to-end.
+
+## License
+
+MIT - see [`LICENSE`](./LICENSE).

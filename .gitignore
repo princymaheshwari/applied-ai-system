@@ -1,43 +1,76 @@
-# Byte-compiled / cache files
+# --- Byte-compiled / cache files ---
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
 
-# Virtual environments
+# --- Distribution / packaging ---
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+*.egg
+
+# --- Virtual environments ---
 .venv/
 venv/
 env/
 ENV/
 .conda/
-*.egg-info/
-.eggs/
-pip-wheel-metadata/
 
-# Environment and config
+# --- Environment and config (CRITICAL: never commit secrets) ---
 .env
 .env.*
+!.env.example
 *.env
-
-# Streamlit
+secrets.toml
 .streamlit/secrets.toml
 
-# Test and coverage artifacts
+# --- Test, type-check, and coverage artifacts ---
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
 .coverage.*
 htmlcov/
 nosetests.xml
 coverage.xml
 
-# Logs
+# --- Logs and runtime data ---
 *.log
+logs/
+runs/
+trace_store/
+*.sqlite
+*.sqlite3
+*.db
 
-# OS generated files
+# --- Local cache (multi-source retrieval cache, etc.) ---
+.cache/
+cache/
+
+# --- OS generated files ---
 .DS_Store
 Thumbs.db
+Desktop.ini
 
-# Editor and IDE settings
+# --- Editor and IDE settings ---
 .vscode/
 .idea/
 *.swp
 *.swo
+*.bak
+
+# --- Cursor (keep plans visible to user, but ignore project-specific data) ---
+# .cursor/plans is intentionally NOT ignored so the plan stays in the repo
+
+# --- Docker artifacts ---
+*.tar
+.docker/
+
+# --- Project-specific outputs ---
+snapshots/*.json
+!snapshots/.gitkeep
+eval_reports/
+generated_mcp_servers/

@@ -1,0 +1,78 @@
+%% CONFIG DETECTIVE - System Architecture
+%% Render at https://mermaid.live/ and export PNG to assets/architecture.png
+flowchart TB
+    subgraph inputs [Inputs]
+        snapA[Snapshot A: works]
+        snapB[Snapshot B: fails]
+        trace[Failure trace]
+    end
+
+    subgraph snapshot [Snapshot Layer]
+        sn[Snapshotter CLI]
+        lock[Lockfile parser]
+        dock[Dockerfile parser]
+        envv[Env var capture]
+        ospk[OS pkg list]
+        runtime[Runtime versions]
+    end
+
+    subgraph graphRag [Environment Graph RAG]
+        builder[Graph builder NetworkX]
+        differ[Differ - delta extraction]
+        prio[Suspect prioritizer]
+    end
+
+    subgraph memory [Memory RAG - Supabase pgvector]
+        epis[Episodic memory: past cases]
+        sem[Semantic memory: pattern fingerprints]
+        refl[Reflection agent]
+    end
+
+    subgraph external [Multi-Source RAG]
+        gh[GitHub Issues]
+        so[StackExchange]
+        osv[OSV.dev CVEs]
+        debian[Debian/PyPI metadata]
+    end
+
+    subgraph orch [LangGraph Multi-Agent Orchestrator]
+        triager[Triager]
+        hypo[Hypothesizer k=3]
+        verif[Sandbox Verifier]
+        critic[Critic + confidence]
+        reporter[Reporter]
+    end
+
+    subgraph guards [Guardrails]
+        pii[PII scrubber]
+        halluc[Hallucination guard]
+        limits[Resource caps]
+    end
+
+    subgraph patcher [Patcher]
+        diffgen[Unified diff builder]
+        applier[Applier]
+        rollback[Rollback / undo]
+    end
+
+    subgraph outputs [Outputs]
+        report[Root-cause report]
+        cliOut[CLI output]
+        streamlit[Streamlit Live Trace Viewer]
+        mcpsrv[MCP server for Cursor]
+    end
+
+    sandboxRuntime[Docker disposable containers]
+
+    inputs --> snapshot
+    snapshot --> graphRag
+    graphRag --> orch
+    memory --> orch
+    external --> orch
+    orch --> guards
+    guards --> patcher
+    patcher --> outputs
+    refl --> memory
+    verif <--> sandboxRuntime
+    orch --> streamlit
+    patcher --> mcpsrv

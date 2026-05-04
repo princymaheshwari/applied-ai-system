@@ -1,0 +1,1 @@
+"""Model Context Protocol server - exposes the agent's investigation tools (compare_envs, propose_fix, apply_fix, undo_fix, etc.) so Cursor and Claude Desktop can drive investigations directly. Lands in Phase 8b."""

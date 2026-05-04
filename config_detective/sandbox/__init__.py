@@ -1,0 +1,1 @@
+"""Sandbox runtime - Docker SDK ephemeral containers with resource caps, plus a Windows subprocess fallback for graceful degradation when Docker is unavailable. Lands in Phase 6."""

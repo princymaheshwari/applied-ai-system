@@ -1,0 +1,1 @@
+"""Multi-agent orchestrator - LangGraph state machine with observable intermediate states: Triager -> Prioritizer -> Hypothesizer (k=3) -> Sandbox Verifier -> Critic -> Reporter. Lands in Phase 5."""

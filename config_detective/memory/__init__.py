@@ -1,0 +1,1 @@
+"""Memory RAG - Supabase pgvector backed episodic memory of past investigations, plus a semantic memory of compressed pattern fingerprints. Lands in Phase 3."""

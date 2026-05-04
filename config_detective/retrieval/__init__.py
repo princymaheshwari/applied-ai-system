@@ -1,0 +1,1 @@
+"""Multi-source retrieval - GitHub Issues, StackExchange, OSV.dev, libraries.io with fan-out, dedup, and local SQLite cache. Lands in Phase 4."""

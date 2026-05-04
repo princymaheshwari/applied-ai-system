@@ -1,3 +1,39 @@
-streamlit>=1.21.0
-altair<5
-pytest
+# CONFIG DETECTIVE - core dependencies
+# Install with: pip install -r requirements.txt
+# For development extras (pytest, etc.), also: pip install -r requirements-dev.txt
+
+# UI and CLI
+streamlit>=1.40.0
+typer>=0.12.0
+rich>=13.7.0
+
+# Data validation and config
+pydantic>=2.6.0
+python-dotenv>=1.0.0
+
+# Graph + parsing
+networkx>=3.2
+dockerfile-parse>=2.0.0
+packaging>=24.0
+
+# Database and HTTP
+supabase>=2.5.0
+httpx>=0.27.0
+
+# LLM providers
+groq>=0.11.0
+google-generativeai>=0.5.0
+huggingface-hub>=0.24.0
+
+# Sandbox runtime
+docker>=7.1.0
+
+# Agent framework
+langgraph>=0.2.0
+langchain-core>=0.3.0
+
+# Model Context Protocol
+mcp>=1.0.0
+
+# Reporting
+tabulate>=0.9.0

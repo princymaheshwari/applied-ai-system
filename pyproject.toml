@@ -1,0 +1,85 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "config-detective"
+version = "0.1.0"
+description = "Agentic forensics tool that diagnoses 'works on my machine' bugs via differential bisection over a multi-layer environment graph, with empirical sandbox verification and an MCP server for Cursor."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Princy Maheshwari" }
+]
+keywords = [
+    "agentic-ai",
+    "graph-rag",
+    "memory-rag",
+    "mcp",
+    "model-context-protocol",
+    "debugging",
+    "config-bisection",
+    "applied-ai",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    "streamlit>=1.40.0",
+    "typer>=0.12.0",
+    "rich>=13.7.0",
+    "pydantic>=2.6.0",
+    "python-dotenv>=1.0.0",
+    "networkx>=3.2",
+    "dockerfile-parse>=2.0.0",
+    "packaging>=24.0",
+    "supabase>=2.5.0",
+    "httpx>=0.27.0",
+    "groq>=0.11.0",
+    "google-generativeai>=0.5.0",
+    "huggingface-hub>=0.24.0",
+    "docker>=7.1.0",
+    "langgraph>=0.2.0",
+    "langchain-core>=0.3.0",
+    "mcp>=1.0.0",
+    "tabulate>=0.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.12.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
+]
+
+[project.scripts]
+config-detective = "config_detective.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/princymaheshwari/applied-ai-system"
+Repository = "https://github.com/princymaheshwari/applied-ai-system"
+
+[tool.setuptools.packages.find]
+include = ["config_detective*"]
+exclude = ["legacy*", "tests*", "assets*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-ra --strict-markers --tb=short"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks integration tests requiring external services",
+    "sandbox: marks tests requiring Docker sandbox",
+]

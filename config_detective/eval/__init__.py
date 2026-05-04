@@ -1,0 +1,1 @@
+"""Evaluation harness - the 15-case seeded benchmark covering locale, openssl, glibc / musl, timezone, python version, missing OS packages, lockfile drift, and env vars. Lands in Phase 10."""

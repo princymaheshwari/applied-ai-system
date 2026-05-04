@@ -1,0 +1,1 @@
+"""Patcher - unified-diff builder, in-place applier, and rollback (undo) for the agent's verified fixes. Supports propose-by-default and opt-in --apply modes. Lands in Phase 8a."""

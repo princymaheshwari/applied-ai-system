@@ -1,0 +1,1 @@
+"""CONFIG DETECTIVE test suite."""

@@ -1,0 +1,1 @@
+"""LLM clients - Groq (primary) and Gemini (fallback) for reasoning, HuggingFace Inference (Qwen2.5-Coder, bge embeddings) for code understanding and embeddings. Used across Phases 3, 5."""
