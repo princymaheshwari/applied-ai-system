@@ -78,8 +78,10 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-ra --strict-markers --tb=short"
+asyncio_mode = "auto"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks integration tests requiring external services",
     "sandbox: marks tests requiring Docker sandbox",
+    "asyncio: marks async tests",
 ]
