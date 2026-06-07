@@ -203,6 +203,11 @@ class InvestigationState(TypedDict, total=False):
     hypotheses: list[dict[str, Any]]  # Serialized Hypothesis objects
     selected_hypothesis: dict[str, Any] | None  # The winning hypothesis
 
+    # === Sandbox Verification ===
+    verification_results: list[dict[str, Any]]  # Serialized VerificationResult objects
+    sandbox_backend: str  # "docker" | "subprocess" | "none"
+    fixes_verified: int  # Count of fixes that passed sandbox verification
+
     # === Control Flow ===
     confidence: float  # Current confidence score (0.0-1.0)
     confidence_threshold: float  # Minimum required confidence
@@ -264,6 +269,10 @@ def create_initial_state(
         # Hypotheses
         hypotheses=[],
         selected_hypothesis=None,
+        # Sandbox verification
+        verification_results=[],
+        sandbox_backend="none",
+        fixes_verified=0,
         # Control
         confidence=0.0,
         confidence_threshold=confidence_threshold,

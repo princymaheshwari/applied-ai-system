@@ -4,13 +4,14 @@ This module creates the LangGraph state machine that orchestrates the
 entire CONFIG DETECTIVE investigation flow:
 
     Triage -> Build_Graph -> Diff -> Memory_Recall -> Retrieval ->
-    Hypothesize -> Critique -> [loop or finalize] -> Report
+    Hypothesize -> Verify_in_Sandbox -> Critique -> [loop or finalize] -> Report
 
 Features:
 - Conditional routing based on confidence scores
 - Iteration limits to prevent infinite loops
 - Observable trace events at each step
 - Graceful degradation when components are unavailable
+- Sandbox verification of candidate fixes (Docker or subprocess fallback)
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from .nodes import (
     memory_recall_node,
     retrieval_node,
     hypothesizer_node,
+    verifier_node,
     critic_node,
     reporter_node,
 )
@@ -76,6 +78,7 @@ def create_investigation_graph() -> StateGraph:
     workflow.add_node("memory_recall", memory_recall_node)
     workflow.add_node("retrieval", retrieval_node)
     workflow.add_node("hypothesizer", hypothesizer_node)
+    workflow.add_node("verifier", verifier_node)
     workflow.add_node("critic", critic_node)
     workflow.add_node("reporter", reporter_node)
 
@@ -89,7 +92,8 @@ def create_investigation_graph() -> StateGraph:
     workflow.add_edge("differ", "memory_recall")
     workflow.add_edge("memory_recall", "retrieval")
     workflow.add_edge("retrieval", "hypothesizer")
-    workflow.add_edge("hypothesizer", "critic")
+    workflow.add_edge("hypothesizer", "verifier")
+    workflow.add_edge("verifier", "critic")
 
     # Conditional edge from critic
     workflow.add_conditional_edges(
@@ -310,7 +314,8 @@ graph TD
     differ --> memory_recall[Memory Recall]
     memory_recall --> retrieval[Retrieval]
     retrieval --> hypothesizer[Hypothesizer]
-    hypothesizer --> critic[Critic]
+    hypothesizer --> verifier[Sandbox Verifier]
+    verifier --> critic[Critic]
     critic -->|confidence >= threshold| reporter[Reporter]
     critic -->|confidence < threshold| hypothesizer
     reporter --> END((End))
@@ -321,6 +326,7 @@ graph TD
     style memory_recall fill:#fff3e0
     style retrieval fill:#fff3e0
     style hypothesizer fill:#e8f5e9
+    style verifier fill:#e8f5e9
     style critic fill:#fce4ec
     style reporter fill:#f3e5f5
 """

@@ -10,6 +10,7 @@ from .differ import differ_node
 from .memory_recall import memory_recall_node
 from .retrieval import retrieval_node
 from .hypothesizer import hypothesizer_node
+from .verifier import verifier_node
 from .critic import critic_node
 from .reporter import reporter_node
 
@@ -20,6 +21,7 @@ __all__ = [
     "memory_recall_node",
     "retrieval_node",
     "hypothesizer_node",
+    "verifier_node",
     "critic_node",
     "reporter_node",
 ]
