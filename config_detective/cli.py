@@ -134,7 +134,64 @@ def investigate(
     ),
 ) -> None:
     """Run a full investigation: diff, prioritize, hypothesize, sandbox-verify, report."""
-    _stub("5", f"orchestrator lands in Phase 5. mode={mode!r} yes={yes}")
+    from config_detective.snapshot import load_snapshot
+    from config_detective.agents.state import create_initial_state
+    from config_detective.agents.orchestrator import run_investigation_sync
+
+    snap_a_obj = load_snapshot(snap_a)
+    snap_b_obj = load_snapshot(snap_b)
+    failure_trace = trace.read_text(encoding="utf-8")
+
+    state = create_initial_state(
+        snapshot_a_dict=snap_a_obj.to_json(),
+        snapshot_b_dict=snap_b_obj.to_json(),
+        failure_trace=failure_trace,
+    )
+
+    console.print("[blue]Running investigation...[/blue]")
+    final = run_investigation_sync(state)
+
+    report = final.get("report", {})
+    hypothesis = final.get("selected_hypothesis")
+
+    console.print()
+    console.print(f"[bold]Status:[/bold] {report.get('status', 'unknown')}")
+    console.print(f"[bold]Confidence:[/bold] {report.get('confidence', 0):.0%}")
+
+    if hypothesis:
+        console.print(f"[bold]Root cause:[/bold] {hypothesis.get('delta_id', 'N/A')}")
+        console.print(f"[bold]Explanation:[/bold] {hypothesis.get('explanation', 'N/A')}")
+        fix_code = hypothesis.get("fix_code", "")
+        if fix_code:
+            console.print(f"[bold]Fix:[/bold] {fix_code}")
+
+            if mode == "apply":
+                from config_detective.patcher import propose_fix, apply_fix
+                from config_detective.patcher.unified_diff import infer_target_file
+                from config_detective.patcher.confirm import confirm_apply
+
+                target = infer_target_file(fix_code, repo_path=".")
+                if target:
+                    target_path = Path(target)
+                    content = target_path.read_text(encoding="utf-8") if target_path.exists() else ""
+                    patch = propose_fix(
+                        fix_code=fix_code,
+                        target_file=target,
+                        content=content,
+                        trace_id=final.get("trace_id", ""),
+                        confidence=hypothesis.get("confidence", 0.0),
+                        description=hypothesis.get("explanation", ""),
+                    )
+                    if confirm_apply(patch, auto_yes=yes):
+                        result = apply_fix(patch, repo_path=".", dry_run=False)
+                        if result.success:
+                            console.print(f"[green]Patch applied:[/green] {result.message}")
+                        else:
+                            console.print(f"[red]Patch failed:[/red] {result.message}")
+                    else:
+                        console.print("[yellow]Patch application cancelled.[/yellow]")
+    else:
+        console.print("[yellow]No fix identified. See full report for details.[/yellow]")
 
 
 @app.command(name="apply")
@@ -143,7 +200,27 @@ def apply_cmd(
     yes: bool = typer.Option(False, "--yes", help="Skip confirmation prompt."),
 ) -> None:
     """Apply a previously-proposed fix to the repo."""
-    _stub("8a", f"patcher applier lands in Phase 8a. case_id={case_id} yes={yes}")
+    from config_detective.patcher.rollback import get_backup_store
+    from config_detective.patcher.models import PatchRecord
+    from config_detective.patcher import apply_fix
+    from config_detective.patcher.confirm import confirm_apply
+
+    store = get_backup_store(".")
+    patch_data = store.get_patch_by_case_id(case_id)
+    if not patch_data:
+        console.print(f"[red]No patch found for case {case_id}[/red]")
+        raise typer.Exit(code=1)
+
+    patch = PatchRecord.from_dict(patch_data)
+    if confirm_apply(patch, auto_yes=yes):
+        result = apply_fix(patch, repo_path=".", dry_run=False)
+        if result.success:
+            console.print(f"[green]{result.message}[/green]")
+        else:
+            console.print(f"[red]{result.message}[/red]")
+            raise typer.Exit(code=1)
+    else:
+        console.print("[yellow]Cancelled.[/yellow]")
 
 
 @app.command()
@@ -154,7 +231,14 @@ def undo(
     ),
 ) -> None:
     """Undo a previously-applied patch."""
-    _stub("8a", f"patcher rollback lands in Phase 8a. case_id={case_id}")
+    from config_detective.patcher import undo_fix
+
+    result = undo_fix(case_id=case_id, repo_path=".")
+    if result.success:
+        console.print(f"[green]{result.message}[/green]")
+    else:
+        console.print(f"[red]{result.message}[/red]")
+        raise typer.Exit(code=1)
 
 
 @app.command(name="eval")
@@ -183,7 +267,10 @@ def mcp_serve(
     ),
 ) -> None:
     """Start the MCP server so Cursor / Claude Desktop can drive investigations."""
-    _stub("8b", f"MCP server lands in Phase 8b. transport={transport!r}")
+    from config_detective.mcp_server import run_server
+
+    console.print(f"[blue]Starting MCP server (transport={transport})...[/blue]")
+    run_server(transport=transport)
 
 
 def main() -> None:
