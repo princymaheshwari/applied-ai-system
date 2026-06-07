@@ -208,6 +208,10 @@ class InvestigationState(TypedDict, total=False):
     sandbox_backend: str  # "docker" | "subprocess" | "none"
     fixes_verified: int  # Count of fixes that passed sandbox verification
 
+    # === Guardrails ===
+    guardrails_passed: bool  # Whether all guardrails checks passed
+    guardrails_issues: list[str]  # List of issue descriptions from guardrails
+
     # === Control Flow ===
     confidence: float  # Current confidence score (0.0-1.0)
     confidence_threshold: float  # Minimum required confidence
@@ -273,6 +277,9 @@ def create_initial_state(
         verification_results=[],
         sandbox_backend="none",
         fixes_verified=0,
+        # Guardrails
+        guardrails_passed=True,
+        guardrails_issues=[],
         # Control
         confidence=0.0,
         confidence_threshold=confidence_threshold,

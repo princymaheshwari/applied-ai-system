@@ -4,7 +4,7 @@ This module creates the LangGraph state machine that orchestrates the
 entire CONFIG DETECTIVE investigation flow:
 
     Triage -> Build_Graph -> Diff -> Memory_Recall -> Retrieval ->
-    Hypothesize -> Verify_in_Sandbox -> Critique -> [loop or finalize] -> Report
+    Hypothesize -> Verify_in_Sandbox -> Guardrails -> Critique -> [loop or finalize] -> Report
 
 Features:
 - Conditional routing based on confidence scores
@@ -29,6 +29,7 @@ from .nodes import (
     retrieval_node,
     hypothesizer_node,
     verifier_node,
+    guardrails_node,
     critic_node,
     reporter_node,
 )
@@ -79,6 +80,7 @@ def create_investigation_graph() -> StateGraph:
     workflow.add_node("retrieval", retrieval_node)
     workflow.add_node("hypothesizer", hypothesizer_node)
     workflow.add_node("verifier", verifier_node)
+    workflow.add_node("guardrails", guardrails_node)
     workflow.add_node("critic", critic_node)
     workflow.add_node("reporter", reporter_node)
 
@@ -93,7 +95,8 @@ def create_investigation_graph() -> StateGraph:
     workflow.add_edge("memory_recall", "retrieval")
     workflow.add_edge("retrieval", "hypothesizer")
     workflow.add_edge("hypothesizer", "verifier")
-    workflow.add_edge("verifier", "critic")
+    workflow.add_edge("verifier", "guardrails")
+    workflow.add_edge("guardrails", "critic")
 
     # Conditional edge from critic
     workflow.add_conditional_edges(
@@ -315,7 +318,8 @@ graph TD
     memory_recall --> retrieval[Retrieval]
     retrieval --> hypothesizer[Hypothesizer]
     hypothesizer --> verifier[Sandbox Verifier]
-    verifier --> critic[Critic]
+    verifier --> guardrails[Guardrails]
+    guardrails --> critic[Critic]
     critic -->|confidence >= threshold| reporter[Reporter]
     critic -->|confidence < threshold| hypothesizer
     reporter --> END((End))
@@ -327,6 +331,7 @@ graph TD
     style retrieval fill:#fff3e0
     style hypothesizer fill:#e8f5e9
     style verifier fill:#e8f5e9
+    style guardrails fill:#ffcdd2
     style critic fill:#fce4ec
     style reporter fill:#f3e5f5
 """
