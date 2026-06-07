@@ -193,6 +193,15 @@ def critic_node(state: InvestigationState) -> dict[str, Any]:
                 ],
             }
 
+        # Try to use LLM for richer critique
+        try:
+            from config_detective.llm import get_router
+            llm = get_router()
+        except Exception:
+            llm = None
+
+        failure_trace = state.get("failure_trace", "")
+
         # Score each valid hypothesis
         tracer.progress("Computing final confidence scores...")
         scored_hypotheses = []
@@ -200,6 +209,14 @@ def critic_node(state: InvestigationState) -> dict[str, Any]:
             final_confidence = _compute_final_confidence(
                 h, deltas, similar_cases, external_evidence, error_category
             )
+
+            # If LLM is available, blend its critique with the heuristic score
+            if llm and llm.has_reasoning_llm:
+                critique = llm.critique_hypothesis(h, deltas, failure_trace)
+                if critique:
+                    llm_conf = critique.get("adjusted_confidence", final_confidence)
+                    final_confidence = 0.6 * final_confidence + 0.4 * llm_conf
+
             h_copy = dict(h)
             h_copy["confidence"] = final_confidence
             scored_hypotheses.append(h_copy)

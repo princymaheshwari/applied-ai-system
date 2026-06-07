@@ -12,10 +12,13 @@ Each hypothesis includes:
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from ..state import ErrorCategory, Hypothesis, InvestigationState
 from ..trace import NodeTracer
+
+logger = logging.getLogger(__name__)
 
 
 # Fix templates based on error category and delta type
@@ -247,16 +250,36 @@ def hypothesizer_node(state: InvestigationState) -> dict[str, Any]:
         k = 3
         hypotheses = []
 
+        # Try to use LLM for richer explanations and fixes
+        try:
+            from config_detective.llm import get_router
+            llm = get_router()
+        except Exception:
+            llm = None
+
+        failure_trace = state.get("failure_trace", "")
+
         for i, delta in enumerate(top_deltas[:k]):
             tracer.progress(f"Generating hypothesis {i + 1}/{k}...")
 
-            # Generate explanation
-            explanation = _generate_explanation(
+            # Generate explanation — try LLM first, fall back to template
+            llm_explanation = None
+            if llm and llm.has_reasoning_llm:
+                llm_explanation = llm.generate_explanation(delta, error_type, failure_trace)
+
+            explanation = llm_explanation or _generate_explanation(
                 delta, error_category, error_type, similar_cases, external_evidence
             )
 
-            # Generate fix
-            fix_suggestion, fix_code = _generate_fix(delta, error_category)
+            # Generate fix — try LLM first, fall back to template
+            llm_fix = (None, None)
+            if llm and llm.has_reasoning_llm:
+                llm_fix = llm.generate_fix(delta, error_type, explanation)
+
+            if llm_fix[0] is not None:
+                fix_suggestion, fix_code = llm_fix
+            else:
+                fix_suggestion, fix_code = _generate_fix(delta, error_category)
 
             # Estimate confidence
             confidence = _estimate_confidence(

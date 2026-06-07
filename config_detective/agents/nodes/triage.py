@@ -219,6 +219,18 @@ def triage_node(state: InvestigationState) -> dict[str, Any]:
         error_type = _extract_error_type(failure_trace)
         tracer.progress(f"Error type: {error_type}")
 
+        # If code LLM is available, enhance with trace analysis
+        llm_insight = ""
+        try:
+            from config_detective.llm import get_router
+            llm = get_router()
+            if llm.has_code_llm:
+                analysis = llm.analyse_trace(failure_trace, f"Category: {category.value}")
+                if analysis:
+                    llm_insight = f" LLM insight: {analysis[:200]}"
+        except Exception:
+            pass
+
         # Generate summary
         summary = _generate_triage_summary(category, error_type, confidence)
         tracer.set_result({
@@ -228,7 +240,7 @@ def triage_node(state: InvestigationState) -> dict[str, Any]:
         })
 
         # Add to reasoning chain
-        reasoning = [f"Triage: {summary}"]
+        reasoning = [f"Triage: {summary}{llm_insight}"]
 
         return {
             "error_category": category.value,
